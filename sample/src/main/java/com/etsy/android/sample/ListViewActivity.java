@@ -1,17 +1,14 @@
 package com.etsy.android.sample;
 
 import android.app.Activity;
-import android.content.Context;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
-import android.view.ViewGroup;
 import android.widget.*;
-import com.etsy.android.grid.StaggeredGridView;
 
 import java.util.List;
 
-public class ListViewActivity extends Activity {
+public class ListViewActivity extends Activity implements AdapterView.OnItemClickListener {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -36,6 +33,7 @@ public class ListViewActivity extends Activity {
 
         final SampleAdapter adapter = new SampleAdapter(this, R.id.txt_line1);
         listView.setAdapter(adapter);
+        listView.setOnItemClickListener(this);
 
         final List<String> sampleData = SampleData.generateSampleData();
         for (String data : sampleData) {
@@ -43,4 +41,8 @@ public class ListViewActivity extends Activity {
         }
     }
 
+    @Override
+    public void onItemClick(AdapterView<?> adapterView, View view, int position, long id) {
+        Toast.makeText(this, "Item Clicked: " + position, Toast.LENGTH_SHORT).show();
+    }
 }

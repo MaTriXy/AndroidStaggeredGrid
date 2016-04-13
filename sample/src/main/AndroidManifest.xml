@@ -6,7 +6,7 @@
 
     <uses-sdk
         android:minSdkVersion="10"
-        android:targetSdkVersion="17" />
+        android:targetSdkVersion="19" />
 
     <application
         android:allowBackup="true"
@@ -23,6 +23,8 @@
         </activity>
 
         <activity android:name=".StaggeredGridActivity"/>
+        <activity android:name=".StaggeredGridActivityFragment"/>
+        <activity android:name=".StaggeredGridEmptyViewActivity" />
         <activity android:name=".ListViewActivity"/>
 
     </application>

@@ -16,9 +16,8 @@
 
 package com.etsy.android.grid;
 
-import java.util.Arrays;
-
 import android.content.Context;
+import android.content.res.Configuration;
 import android.content.res.TypedArray;
 import android.os.Parcel;
 import android.os.Parcelable;
@@ -27,6 +26,8 @@ import android.util.Log;
 import android.util.SparseArray;
 import android.view.View;
 import android.view.ViewGroup;
+
+import java.util.Arrays;
 
 /**
  * A staggered grid view which supports multiple columns with rows of varying sizes.
@@ -40,7 +41,7 @@ public class StaggeredGridView extends ExtendableListView {
     private static final String TAG = "StaggeredGridView";
     private static final boolean DBG = false;
 
-    private static final int DEFAUlT_COLUMNS_PORTRAIT = 2;
+    private static final int DEFAULT_COLUMNS_PORTRAIT = 2;
     private static final int DEFAULT_COLUMNS_LANDSCAPE = 3;
 
     private int mColumnCount;
@@ -48,7 +49,7 @@ public class StaggeredGridView extends ExtendableListView {
     private int mColumnWidth;
     private boolean mNeedSync;
 
-    private int mColumnCountPortrait = DEFAUlT_COLUMNS_PORTRAIT;
+    private int mColumnCountPortrait = DEFAULT_COLUMNS_PORTRAIT;
     private int mColumnCountLandscape = DEFAULT_COLUMNS_LANDSCAPE;
 
     /**
@@ -152,12 +153,21 @@ public class StaggeredGridView extends ExtendableListView {
             // get the number of columns in portrait and landscape
             TypedArray typedArray = context.obtainStyledAttributes(attrs, R.styleable.StaggeredGridView, defStyle, 0);
 
-            mColumnCountPortrait = typedArray.getInteger(
-                    R.styleable.StaggeredGridView_column_count_portrait,
-                    DEFAUlT_COLUMNS_PORTRAIT);
-            mColumnCountLandscape = typedArray.getInteger(
-                    R.styleable.StaggeredGridView_column_count_landscape,
-                    DEFAULT_COLUMNS_LANDSCAPE);
+            mColumnCount = typedArray.getInteger(
+                    R.styleable.StaggeredGridView_column_count, 0);
+
+            if (mColumnCount > 0) {
+                mColumnCountPortrait = mColumnCount;
+                mColumnCountLandscape = mColumnCount;
+            }
+            else {
+                mColumnCountPortrait = typedArray.getInteger(
+                        R.styleable.StaggeredGridView_column_count_portrait,
+                        DEFAULT_COLUMNS_PORTRAIT);
+                mColumnCountLandscape = typedArray.getInteger(
+                        R.styleable.StaggeredGridView_column_count_landscape,
+                        DEFAULT_COLUMNS_LANDSCAPE);
+            }
 
             mItemMargin = typedArray.getDimensionPixelSize(
                     R.styleable.StaggeredGridView_item_margin, 0);
@@ -208,17 +218,40 @@ public class StaggeredGridView extends ExtendableListView {
         mGridPaddingRight = right;
         mGridPaddingBottom = bottom;
     }
+    
+    public void setColumnCountPortrait(int columnCountPortrait) {
+    	mColumnCountPortrait = columnCountPortrait;
+    	onSizeChanged(getWidth(), getHeight());
+    	requestLayoutChildren();
+    }
+    
+    public void setColumnCountLandscape(int columnCountLandscape) {
+    	mColumnCountLandscape = columnCountLandscape;
+    	onSizeChanged(getWidth(), getHeight());
+    	requestLayoutChildren();
+    }
+    
+    public void setColumnCount(int columnCount) {
+    	mColumnCountPortrait = columnCount;
+    	mColumnCountLandscape = columnCount;
+        // mColumnCount set onSizeChanged();
+    	onSizeChanged(getWidth(), getHeight());
+    	requestLayoutChildren();
+    }
 
     // //////////////////////////////////////////////////////////////////////////////////////////
     // MEASUREMENT
     //
+    private boolean isLandscape() {
+        return getResources().getConfiguration().orientation == Configuration.ORIENTATION_LANDSCAPE;
+    }
 
     @Override
     protected void onMeasure(final int widthMeasureSpec, final int heightMeasureSpec) {
         super.onMeasure(widthMeasureSpec, heightMeasureSpec);
 
         if (mColumnCount <= 0) {
-            boolean isLandscape = getMeasuredWidth() > getMeasuredHeight();
+            boolean isLandscape = isLandscape();
             mColumnCount = isLandscape ? mColumnCountLandscape : mColumnCountPortrait;
         }
 
@@ -230,19 +263,17 @@ public class StaggeredGridView extends ExtendableListView {
 
         if (mColumnTops == null || mColumnTops.length != mColumnCount) {
             mColumnTops = new int[mColumnCount];
+            initColumnTops();
         }
         if (mColumnBottoms == null || mColumnBottoms.length != mColumnCount) {
             mColumnBottoms = new int[mColumnCount];
+            initColumnBottoms();
         }
         if (mColumnLefts == null || mColumnLefts.length != mColumnCount) {
             mColumnLefts = new int[mColumnCount];
-        }
-
-        for (int i = 0; i < mColumnCount; i++) {
-            mColumnLefts[i] = calculateColumnLeft(i);
+            initColumnLefts();
         }
     }
-
 
     @Override
     protected void onMeasureChild(final View child, final LayoutParams layoutParams) {
@@ -264,7 +295,7 @@ public class StaggeredGridView extends ExtendableListView {
                 childHeightSpec = MeasureSpec.makeMeasureSpec(layoutParams.height, MeasureSpec.EXACTLY);
             }
             else {
-                childHeightSpec = MeasureSpec.makeMeasureSpec(LayoutParams.WRAP_CONTENT, MeasureSpec.EXACTLY);
+                childHeightSpec = MeasureSpec.makeMeasureSpec(LayoutParams.WRAP_CONTENT, MeasureSpec.UNSPECIFIED);
             }
             child.measure(childWidthSpec, childHeightSpec);
         }
@@ -286,15 +317,11 @@ public class StaggeredGridView extends ExtendableListView {
             if (mColumnTops == null) {
                 mColumnTops = new int[mColumnCount];
             }
-            else {
-                Arrays.fill(mColumnTops, 0);
-            }
             if (mColumnBottoms == null) {
                 mColumnBottoms = new int[mColumnCount];
             }
-            else {
-                Arrays.fill(mColumnBottoms, 0);
-            }
+            initColumnTopsAndBottoms();
+
             mPositionData.clear();
             mNeedSync = false;
             mDistanceToTop = 0;
@@ -318,6 +345,14 @@ public class StaggeredGridView extends ExtendableListView {
         }
         else {
             setPositionIsHeaderFooter(position);
+        }
+    }
+    
+    private void requestLayoutChildren() {
+        final int count = getChildCount();
+        for (int i = 0; i < count; i++) {
+            final View v = getChildAt(i);
+            if (v != null) v.requestLayout();
         }
     }
 
@@ -823,7 +858,13 @@ public class StaggeredGridView extends ExtendableListView {
     @Override
     protected void onSizeChanged(final int w, final int h, final int oldw, final int oldh) {
         super.onSizeChanged(w, h, oldw, oldh);
-        boolean isLandscape = w > h;
+        onSizeChanged(w, h);
+    }
+
+    @Override
+    protected void onSizeChanged(int w, int h) {
+    	super.onSizeChanged(w, h);
+        boolean isLandscape = isLandscape();
         int newColumnCount = isLandscape ? mColumnCountLandscape : mColumnCountPortrait;
         if (mColumnCount != newColumnCount) {
             mColumnCount = newColumnCount;
@@ -836,10 +877,9 @@ public class StaggeredGridView extends ExtendableListView {
 
             mDistanceToTop = 0;
 
-            // rebuild the column lefts
-            for (int i = 0; i < mColumnCount; i++) {
-                mColumnLefts[i] = calculateColumnLeft(i);
-            }
+            // rebuild the columns
+            initColumnTopsAndBottoms();
+            initColumnLefts();
 
             // if we have data
             if (getCount() > 0 && mPositionData.size() > 0) {
@@ -886,8 +926,13 @@ public class StaggeredGridView extends ExtendableListView {
         if (DBG) Log.d(TAG, "onColumnSync column width:" + mColumnWidth);
 
         for (int pos = 0; pos < syncPosition; pos++) {
+            //Check for weirdness again
+            final Double heightRatio = positionHeightRatios.get(pos);
+            if(heightRatio == null){
+                break;
+            }
+
             final GridItemRecord rec = getOrCreateRecord(pos);
-            final double heightRatio = positionHeightRatios.get(pos);
             final int height = (int) (mColumnWidth * heightRatio);
             rec.heightRatio = heightRatio;
 
@@ -1011,6 +1056,26 @@ public class StaggeredGridView extends ExtendableListView {
         }
         return column;
     }
+
+    private void initColumnTopsAndBottoms() {
+        initColumnTops();
+        initColumnBottoms();
+    }
+
+    private void initColumnTops() {
+        Arrays.fill(mColumnTops, getPaddingTop() + mGridPaddingTop);
+    }
+
+    private void initColumnBottoms() {
+        Arrays.fill(mColumnBottoms, getPaddingTop() + mGridPaddingTop);
+    }
+
+    private void initColumnLefts() {
+        for (int i = 0; i < mColumnCount; i++) {
+            mColumnLefts[i] = calculateColumnLeft(i);
+        }
+    }
+
 
     // //////////////////////////////////////////////////////////////////////////////////////////
     // BOTTOM
@@ -1231,6 +1296,7 @@ public class StaggeredGridView extends ExtendableListView {
         GridListSavedState ss = (GridListSavedState) state;
         mColumnCount = ss.columnCount;
         mColumnTops = ss.columnTops;
+        mColumnBottoms = new int[mColumnCount];
         mPositionData = ss.positionData;
         mNeedSync = true;
         super.onRestoreInstanceState(ss);
